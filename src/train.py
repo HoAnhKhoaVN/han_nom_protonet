@@ -335,7 +335,7 @@ def main():
         batch_size= options.batch_size_classify,
     )
 
-    model = init_protonet(num_classes= len(classes))
+    model = init_protonet(num_classes= len(classes), cuda = options.cuda)
     optim = init_optim(options, model)
     lr_scheduler = init_lr_scheduler(options, optim)
     res = train(opt=options,
