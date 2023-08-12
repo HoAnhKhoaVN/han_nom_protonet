@@ -1,8 +1,8 @@
 python3 train.py -root dataset_han_nom_real_synth \
                  -exp /content/drive/MyDrive/Master/NLP \
-                 -nep 1 \
+                 -nep 60000 \
                  -lr 1e-3 \
-                 -its 1 \
+                 -its 100 \
                  -cTr 5 \
                  -nsTr 5 \
                  -nqTr 5 \
