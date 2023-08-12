@@ -1,5 +1,11 @@
 # Custom
 dataset/
+src/demo_ds
+src/exp
+*.plk
+src/omniglot_dataset.py
+src/protonet.py
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
