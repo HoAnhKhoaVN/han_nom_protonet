@@ -1,0 +1,7 @@
+torch
+torchvision
+six
+numpy
+Pillow
+tqdm
+torch-tb-profiler
