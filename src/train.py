@@ -140,11 +140,12 @@ def train(
     best_model_cls_path = os.path.join(opt.experiment_root, 'best_model_cls.pth')
     last_model_cls_path = os.path.join(opt.experiment_root, 'last_model_cls.pth')
 
+    iteration = 0
     for epoch in range(opt.epochs):
-        print('=== Epoch: {} ==='.format(epoch))
         tr_iter = iter(tr_dataloader)
         model.train()
         for batch in tqdm(tr_iter):
+            iteration+=1
             optim.zero_grad()
             x, y = batch
             x, y = x.to(device), y.to(device)
@@ -156,77 +157,80 @@ def train(
             train_loss.append(loss.item())
             train_acc.append(acc.item())
 
-        avg_loss = np.mean(train_loss[-opt.iterations:])
-        avg_acc = np.mean(train_acc[-opt.iterations:])
-        print('Avg Train Loss: {}, Avg Train Acc: {}'.format(avg_loss, avg_acc))
-        writer.add_scalar('training loss',
-                            avg_loss,
-                            epoch)
-        
-        writer.add_scalar('Train Acc',
-                    avg_acc,
-                    epoch)
 
         lr_scheduler.step()
-        # region Validation on task
-        if val_dataloader is None:
-            continue
-        val_iter = iter(val_dataloader)
-        model.eval()
-        for batch in val_iter:
-            x, y = batch
-            x, y = x.to(device), y.to(device)
-            model_output = model(x)
-            loss, acc = loss_fn(model_output, target=y,
-                                n_support=opt.num_support_val)
-            val_loss.append(loss.item())
-            val_acc.append(acc.item())
-        avg_loss = np.mean(val_loss[-opt.iterations:])
-        avg_acc = np.mean(val_acc[-opt.iterations:])
+        if iteration % 500 == 0:
+          avg_loss = np.mean(train_loss[-opt.iterations:])
+          avg_acc = np.mean(train_acc[-opt.iterations:])
+          print(f'iter: {iteration}')
+          print('Avg Train Loss: {}, Avg Train Acc: {}'.format(avg_loss, avg_acc))
+          writer.add_scalar('training loss',
+                              avg_loss,
+                              epoch)
+          
+          writer.add_scalar('Train Acc',
+                      avg_acc,
+                      epoch)
 
-        postfix = ' (Best)' if avg_acc >= best_acc else ' (Best: {})'.format(
-            best_acc)
-        print('Avg Val Loss: {}, Avg Val Acc: {}{}'.format(
-            avg_loss, avg_acc, postfix))
-        
-        writer.add_scalar('Avg Val Loss',
-                            avg_loss,
-                            epoch)
-        
-        writer.add_scalar('Avg Val Acc',
-                    avg_acc,
-                    epoch)
+          # region Validation on task
+          if val_dataloader is None:
+              continue
+          val_iter = iter(val_dataloader)
+          model.eval()
+          for batch in val_iter:
+              x, y = batch
+              x, y = x.to(device), y.to(device)
+              model_output = model(x)
+              loss, acc = loss_fn(model_output, target=y,
+                                  n_support=opt.num_support_val)
+              val_loss.append(loss.item())
+              val_acc.append(acc.item())
+          avg_loss = np.mean(val_loss[-opt.iterations:])
+          avg_acc = np.mean(val_acc[-opt.iterations:])
 
-        if avg_acc >= best_acc:
-            torch.save(model.state_dict(), best_model_path)
-            best_acc = avg_acc
-            best_state = model.state_dict()
-        # endregion
+          postfix = ' (Best)' if avg_acc >= best_acc else ' (Best: {})'.format(
+              best_acc)
+          print('Avg Val Loss: {}, Avg Val Acc: {}{}'.format(
+              avg_loss, avg_acc, postfix))
+          
+          writer.add_scalar('Avg Val Loss',
+                              avg_loss,
+                              iteration)
+          
+          writer.add_scalar('Avg Val Acc',
+                      avg_acc,
+                      iteration)
 
-        # region Validation on classification
-        if val_classifier_dataloader is None:
-            continue
+          if avg_acc >= best_acc:
+              torch.save(model.state_dict(), best_model_path)
+              best_acc = avg_acc
+              best_state = model.state_dict()
+          # endregion
 
-        cur_acc_cls, valid_loss_cls= evaluate(
-            model,
-            val_classifier_dataloader,
-            device
-        )
-        postfix = ' (Best)' if cur_acc_cls >= best_acc_cls else f' (Best: {best_acc_cls})'
-        print(f"cur_acc_cls: {cur_acc_cls} - valid_loss_cls: {valid_loss_cls} {postfix}")
-        writer.add_scalar('Avg cur_acc_cls',
-                    cur_acc_cls,
-                    epoch)
-        
-        writer.add_scalar('Avg valid_loss_cls',
-                    valid_loss_cls,
-                    epoch)
+          # region Validation on classification
+          if val_classifier_dataloader is None:
+              continue
 
-        if cur_acc_cls >= best_acc_cls:
-            torch.save(model.state_dict(), best_model_cls_path)
-            best_acc_cls = cur_acc_cls
-            best_state = model.state_dict()
-        # endregion
+          cur_acc_cls, valid_loss_cls= evaluate(
+              model,
+              val_classifier_dataloader,
+              device
+          )
+          postfix = ' (Best)' if cur_acc_cls >= best_acc_cls else f' (Best: {best_acc_cls})'
+          print(f"cur_acc_cls: {cur_acc_cls} - valid_loss_cls: {valid_loss_cls} {postfix}")
+          writer.add_scalar('Avg cur_acc_cls',
+                      cur_acc_cls,
+                      iteration)
+          
+          writer.add_scalar('Avg valid_loss_cls',
+                      valid_loss_cls,
+                      iteration)
+
+          if cur_acc_cls >= best_acc_cls:
+              torch.save(model.state_dict(), best_model_cls_path)
+              best_acc_cls = cur_acc_cls
+              best_state = model.state_dict()
+          # endregion
     torch.save(model.state_dict(), last_model_path)
 
     for name in ['train_loss', 'train_acc', 'val_loss', 'val_acc']:
