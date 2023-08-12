@@ -1,14 +1,28 @@
 # coding=utf-8
 from prototypical_batch_sampler import PrototypicalBatchSampler
 from prototypical_loss import prototypical_loss as loss_fn
-from omniglot_dataset import OmniglotDataset
-from protonet import ProtoNet
+from han_nom_dataset import HanNomDataset, ClassificationDataset
+from torch.utils.data import DataLoader
+from mobilenet import MyMobileNetV2
 from parser_util import get_parser
-
+from evaluate import evaluate
 from tqdm import tqdm
 import numpy as np
 import torch
 import os
+import torchvision.transforms as transforms
+from pickle import dump
+from torch.utils.tensorboard import SummaryWriter
+# from omniglot_dataset import OmniglotDataset
+# from protonet import ProtoNet
+
+def write_plk(
+    fn: str,
+    data
+):
+    with open(fn, 'wb') as f:
+        dump(data, f)
+
 
 
 def init_seed(opt):
@@ -22,13 +36,15 @@ def init_seed(opt):
 
 
 def init_dataset(opt, mode):
-    dataset = OmniglotDataset(mode=mode, root=opt.dataset_root)
+    # dataset = OmniglotDataset(mode=mode, root=opt.dataset_root)
+    dataset = HanNomDataset(mode = mode, root=opt.dataset_root)
     n_classes = len(np.unique(dataset.y))
     if n_classes < opt.classes_per_it_tr or n_classes < opt.classes_per_it_val:
         raise(Exception('There are not enough classes in the dataset in order ' +
                         'to satisfy the chosen classes_per_it. Decrease the ' +
                         'classes_per_it_{tr/val} option and try again.'))
     return dataset
+
 
 
 def init_sampler(opt, labels, mode):
@@ -39,7 +55,7 @@ def init_sampler(opt, labels, mode):
         classes_per_it = opt.classes_per_it_val
         num_samples = opt.num_support_val + opt.num_query_val
 
-    return PrototypicalBatchSampler(labels=labels,
+    return PrototypicalBatchSampler(labels=labels, # All labels
                                     classes_per_it=classes_per_it,
                                     num_samples=num_samples,
                                     iterations=opt.iterations)
@@ -47,17 +63,25 @@ def init_sampler(opt, labels, mode):
 
 def init_dataloader(opt, mode):
     dataset = init_dataset(opt, mode)
+    # write_plk(
+    #     fn=f'{mode}_dataset.plk',
+    #     data= dataset
+    # )
     sampler = init_sampler(opt, dataset.y, mode)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_sampler=sampler)
-    return dataloader
+    dataloader = DataLoader(dataset, batch_sampler=sampler)
+    return dataloader, dataset.classes
 
 
-def init_protonet(opt):
+def init_protonet(
+        num_classes: int,
+        cuda: bool=False,
+    ):
     '''
     Initialize the ProtoNet
     '''
-    device = 'cuda:0' if torch.cuda.is_available() and opt.cuda else 'cpu'
-    model = ProtoNet().to(device)
+    device = 'cuda:0' if torch.cuda.is_available() and cuda else 'cpu'
+    # model = ProtoNet().to(device)
+    model = MyMobileNetV2(num_classes).to(device)
     return model
 
 
@@ -84,7 +108,16 @@ def save_list_to_file(path, thelist):
             f.write("%s\n" % item)
 
 
-def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
+def train(
+        opt,
+        tr_dataloader,
+        model,
+        optim,
+        lr_scheduler,
+        writer: SummaryWriter,
+        val_dataloader=None,
+        val_classifier_dataloader = None,
+        ):
     '''
     Train the model with the prototypical learning algorithm
     '''
@@ -98,9 +131,14 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
     val_loss = []
     val_acc = []
     best_acc = 0
+    best_acc_cls = 0
+    step = 0
 
     best_model_path = os.path.join(opt.experiment_root, 'best_model.pth')
     last_model_path = os.path.join(opt.experiment_root, 'last_model.pth')
+
+    best_model_cls_path = os.path.join(opt.experiment_root, 'best_model_cls.pth')
+    last_model_cls_path = os.path.join(opt.experiment_root, 'last_model_cls.pth')
 
     for epoch in range(opt.epochs):
         print('=== Epoch: {} ==='.format(epoch))
@@ -117,10 +155,20 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
             optim.step()
             train_loss.append(loss.item())
             train_acc.append(acc.item())
+
         avg_loss = np.mean(train_loss[-opt.iterations:])
         avg_acc = np.mean(train_acc[-opt.iterations:])
         print('Avg Train Loss: {}, Avg Train Acc: {}'.format(avg_loss, avg_acc))
+        writer.add_scalar('training loss',
+                            avg_loss,
+                            epoch)
+        
+        writer.add_scalar('Train Acc',
+                    avg_acc,
+                    epoch)
+
         lr_scheduler.step()
+        # region Validation on task
         if val_dataloader is None:
             continue
         val_iter = iter(val_dataloader)
@@ -135,15 +183,50 @@ def train(opt, tr_dataloader, model, optim, lr_scheduler, val_dataloader=None):
             val_acc.append(acc.item())
         avg_loss = np.mean(val_loss[-opt.iterations:])
         avg_acc = np.mean(val_acc[-opt.iterations:])
+
         postfix = ' (Best)' if avg_acc >= best_acc else ' (Best: {})'.format(
             best_acc)
         print('Avg Val Loss: {}, Avg Val Acc: {}{}'.format(
             avg_loss, avg_acc, postfix))
+        
+        writer.add_scalar('Avg Val Loss',
+                            avg_loss,
+                            epoch)
+        
+        writer.add_scalar('Avg Val Acc',
+                    avg_acc,
+                    epoch)
+
         if avg_acc >= best_acc:
             torch.save(model.state_dict(), best_model_path)
             best_acc = avg_acc
             best_state = model.state_dict()
+        # endregion
 
+        # region Validation on classification
+        if val_classifier_dataloader is None:
+            continue
+
+        cur_acc_cls, valid_loss_cls= evaluate(
+            model,
+            val_classifier_dataloader,
+            device
+        )
+        postfix = ' (Best)' if cur_acc_cls >= best_acc_cls else f' (Best: {best_acc_cls})'
+        print(f"cur_acc_cls: {cur_acc_cls} - valid_loss_cls: {valid_loss_cls} {postfix}")
+        writer.add_scalar('Avg cur_acc_cls',
+                    cur_acc_cls,
+                    epoch)
+        
+        writer.add_scalar('Avg valid_loss_cls',
+                    valid_loss_cls,
+                    epoch)
+
+        if cur_acc_cls >= best_acc_cls:
+            torch.save(model.state_dict(), best_model_cls_path)
+            best_acc_cls = cur_acc_cls
+            best_state = model.state_dict()
+        # endregion
     torch.save(model.state_dict(), last_model_path)
 
     for name in ['train_loss', 'train_acc', 'val_loss', 'val_acc']:
@@ -185,7 +268,7 @@ def eval(opt):
 
     init_seed(options)
     test_dataloader = init_dataset(options)[-1]
-    model = init_protonet(options)
+    model = init_protonet(options, opt.cuda)
     model_path = os.path.join(opt.experiment_root, 'best_model.pth')
     model.load_state_dict(torch.load(model_path))
 
@@ -199,6 +282,15 @@ def main():
     Initialize everything and train
     '''
     options = get_parser().parse_args()
+
+    # region Tensorboard
+    writer = SummaryWriter(
+        log_dir=options.experiment_root
+    )
+
+
+    # endregion
+
     if not os.path.exists(options.experiment_root):
         os.makedirs(options.experiment_root)
 
@@ -207,12 +299,43 @@ def main():
 
     init_seed(options)
 
-    tr_dataloader = init_dataloader(options, 'train')
-    val_dataloader = init_dataloader(options, 'val')
+    tr_dataloader, classes = init_dataloader(options, 'train')
+    val_dataloader, _ = init_dataloader(options, 'val')
+    # write_plk(
+    #     fn = 'tr_dataloader.plk',
+    #     data = val_dataloader
+    # )
+    # exit()
     # trainval_dataloader = init_dataloader(options, 'trainval')
-    test_dataloader = init_dataloader(options, 'test')
+    test_dataloader, _ = init_dataloader(options, 'test')
 
-    model = init_protonet(options)
+
+    transform = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Resize((32, 32), antialias= False),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+     ])
+
+    val_classifier_dataloader = DataLoader(
+        dataset= ClassificationDataset(
+            mode= 'val',
+            root_dir= options.dataset_root,
+            transform = transform
+        ),
+        batch_size= options.batch_size_classify,
+    )
+
+    test_classifier_dataloader = DataLoader(
+        dataset= ClassificationDataset(
+            mode= 'test',
+            root_dir= options.dataset_root,
+            transform = transform
+        ),
+        batch_size= options.batch_size_classify,
+    )
+
+    model = init_protonet(num_classes= len(classes))
     optim = init_optim(options, model)
     lr_scheduler = init_lr_scheduler(options, optim)
     res = train(opt=options,
@@ -220,7 +343,10 @@ def main():
                 val_dataloader=val_dataloader,
                 model=model,
                 optim=optim,
-                lr_scheduler=lr_scheduler)
+                lr_scheduler=lr_scheduler,
+                val_classifier_dataloader= val_classifier_dataloader,
+                writer= writer
+            )
     best_state, best_acc, train_loss, train_acc, val_loss, val_acc = res
     print('Testing with last model..')
     test(opt=options,
@@ -233,6 +359,15 @@ def main():
          test_dataloader=test_dataloader,
          model=model)
 
+    model.load_state_dict(
+        torch.load(
+            os.path.join(options.experiment_root, 'best_model_cls.pth')
+        )
+    )
+    print('Testing with best model classification...')
+    device = 'cuda:0' if torch.cuda.is_available() and options.cuda else 'cpu'
+    acc_test_cls, loss_test_cls = evaluate(model, test_classifier_dataloader, device)
+    print(f'acc_test_cls: {acc_test_cls} - loss_test_cls : {loss_test_cls}')
     # optim = init_optim(options, model)
     # lr_scheduler = init_lr_scheduler(options, optim)
 

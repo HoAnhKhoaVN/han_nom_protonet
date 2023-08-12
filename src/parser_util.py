@@ -74,6 +74,11 @@ def get_parser():
                         type=int,
                         help='input for the manual seeds initializations',
                         default=7)
+    
+    parser.add_argument('-bzc', '--batch_size_classify',
+                        type=int,
+                        help='input for the the batch size classifications',
+                        default=32)
 
     parser.add_argument('--cuda',
                         action='store_true',

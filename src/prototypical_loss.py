@@ -25,7 +25,7 @@ def euclidean_dist(x, y):
     n = x.size(0)
     m = y.size(0)
     d = x.size(1)
-    if d != y.size(1):
+    if d != y.size(1): # Different dimensions -> Error!!!
         raise Exception
 
     x = x.unsqueeze(1).expand(n, m, d)
