@@ -1,9 +1,9 @@
 python3 train.py -root dataset_han_nom_real_synth \
-                 -exp /content/drive/MyDrive/Master/NLP \
+                 -exp /content/drive/MyDrive/Master/NLP/ProtoNet_run_on_colab \
                  -nep 60000 \
                  -lr 1e-3 \
-                 -its 100 \
-                 -cTr 100 \
+                 -its 4 \
+                 -cTr 800 \
                  -nsTr 5 \
                  -nqTr 5 \
                  -cVa 100 \

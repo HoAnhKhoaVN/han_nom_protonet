@@ -144,7 +144,7 @@ def train(
     for epoch in range(opt.epochs):
         tr_iter = iter(tr_dataloader)
         model.train()
-        for batch in tqdm(tr_iter):
+        for batch in tr_iter:
             iteration+=1
             optim.zero_grad()
             x, y = batch
