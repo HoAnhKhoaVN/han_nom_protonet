@@ -137,11 +137,11 @@ def train(
     best_model_path = os.path.join(opt.experiment_root, 'best_model.pth')
     last_model_path = os.path.join(opt.experiment_root, 'last_model.pth')
 
-    best_model_cls_path = os.path.join(opt.experiment_root, 'best_model_cls.pth')
-    last_model_cls_path = os.path.join(opt.experiment_root, 'last_model_cls.pth')
+    # best_model_cls_path = os.path.join(opt.experiment_root, 'best_model_cls.pth')
+    # last_model_cls_path = os.path.join(opt.experiment_root, 'last_model_cls.pth')
 
     iteration = 0
-    for epoch in range(opt.epochs):
+    for _ in range(opt.epochs):
         tr_iter = iter(tr_dataloader)
         model.train()
         for batch in tr_iter:
@@ -166,11 +166,11 @@ def train(
           print('Avg Train Loss: {}, Avg Train Acc: {}'.format(avg_loss, avg_acc))
           writer.add_scalar('training loss',
                               avg_loss,
-                              epoch)
+                              iteration)
           
           writer.add_scalar('Train Acc',
                       avg_acc,
-                      epoch)
+                      iteration)
 
           # region Validation on task
           if val_dataloader is None:
@@ -363,15 +363,15 @@ def main():
          test_dataloader=test_dataloader,
          model=model)
 
-    model.load_state_dict(
-        torch.load(
-            os.path.join(options.experiment_root, 'best_model_cls.pth')
-        )
-    )
-    print('Testing with best model classification...')
-    device = 'cuda:0' if torch.cuda.is_available() and options.cuda else 'cpu'
-    acc_test_cls, loss_test_cls = evaluate(model, test_classifier_dataloader, device)
-    print(f'acc_test_cls: {acc_test_cls} - loss_test_cls : {loss_test_cls}')
+    # model.load_state_dict(
+    #     torch.load(
+    #         os.path.join(options.experiment_root, 'best_model_cls.pth')
+    #     )
+    # )
+    # print('Testing with best model classification...')
+    # device = 'cuda:0' if torch.cuda.is_available() and options.cuda else 'cpu'
+    # acc_test_cls, loss_test_cls = evaluate(model, test_classifier_dataloader, device)
+    # print(f'acc_test_cls: {acc_test_cls} - loss_test_cls : {loss_test_cls}')
     # optim = init_optim(options, model)
     # lr_scheduler = init_lr_scheduler(options, optim)
 
