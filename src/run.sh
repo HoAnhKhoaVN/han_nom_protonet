@@ -1,4 +1,4 @@
-python3 train.py -root fsl_train_test_val \
+python3 train.py -root /content/dataset_han_nom \
                  -exp /content/drive/MyDrive/Master/NLP/ProtoNet_run_on_colab \
                  -nep 60000 \
                  -lr 1e-3 \
