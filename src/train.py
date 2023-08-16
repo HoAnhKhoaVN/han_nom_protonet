@@ -207,30 +207,30 @@ def train(
               best_state = model.state_dict()
           # endregion
 
-          # region Validation on classification
-          if val_classifier_dataloader is None:
-              continue
+        #   # region Validation on classification
+        #   if val_classifier_dataloader is None:
+        #       continue
 
-          cur_acc_cls, valid_loss_cls= evaluate(
-              model,
-              val_classifier_dataloader,
-              device
-          )
-          postfix = ' (Best)' if cur_acc_cls >= best_acc_cls else f' (Best: {best_acc_cls})'
-          print(f"cur_acc_cls: {cur_acc_cls} - valid_loss_cls: {valid_loss_cls} {postfix}")
-          writer.add_scalar('Avg cur_acc_cls',
-                      cur_acc_cls,
-                      iteration)
+        #   cur_acc_cls, valid_loss_cls= evaluate(
+        #       model,
+        #       val_classifier_dataloader,
+        #       device
+        #   )
+        #   postfix = ' (Best)' if cur_acc_cls >= best_acc_cls else f' (Best: {best_acc_cls})'
+        #   print(f"cur_acc_cls: {cur_acc_cls} - valid_loss_cls: {valid_loss_cls} {postfix}")
+        #   writer.add_scalar('Avg cur_acc_cls',
+        #               cur_acc_cls,
+        #               iteration)
           
-          writer.add_scalar('Avg valid_loss_cls',
-                      valid_loss_cls,
-                      iteration)
+        #   writer.add_scalar('Avg valid_loss_cls',
+        #               valid_loss_cls,
+        #               iteration)
 
-          if cur_acc_cls >= best_acc_cls:
-              torch.save(model.state_dict(), best_model_cls_path)
-              best_acc_cls = cur_acc_cls
-              best_state = model.state_dict()
-          # endregion
+        #   if cur_acc_cls >= best_acc_cls:
+        #       torch.save(model.state_dict(), best_model_cls_path)
+        #       best_acc_cls = cur_acc_cls
+        #       best_state = model.state_dict()
+        ## endregion
     torch.save(model.state_dict(), last_model_path)
 
     for name in ['train_loss', 'train_acc', 'val_loss', 'val_acc']:

@@ -3,11 +3,11 @@ python3 train.py -root dataset_han_nom_real_synth \
                  -nep 60000 \
                  -lr 1e-3 \
                  -its 4 \
-                 -cTr 800 \
+                 -cTr 5 \
                  -nsTr 5 \
                  -nqTr 5 \
-                 -cVa 100 \
-                 -nsVa 2 \
-                 -nqVa 1 \
+                 -cVa 5 \
+                 -nsVa 5 \
+                 -nqVa 5 \
                  -seed 2103 \
                  --cuda
