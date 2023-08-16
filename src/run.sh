@@ -1,4 +1,4 @@
-python3 train.py -root dataset_han_nom_real_synth \
+python3 train.py -root fsl_train_test_val \
                  -exp /content/drive/MyDrive/Master/NLP/ProtoNet_run_on_colab \
                  -nep 60000 \
                  -lr 1e-3 \
