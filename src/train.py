@@ -23,8 +23,6 @@ def write_plk(
     with open(fn, 'wb') as f:
         dump(data, f)
 
-
-
 def init_seed(opt):
     '''
     Disable cudnn to maximize reproducibility
@@ -33,7 +31,6 @@ def init_seed(opt):
     np.random.seed(opt.manual_seed)
     torch.manual_seed(opt.manual_seed)
     torch.cuda.manual_seed(opt.manual_seed)
-
 
 def init_dataset(opt, mode):
     # dataset = OmniglotDataset(mode=mode, root=opt.dataset_root)
@@ -44,8 +41,6 @@ def init_dataset(opt, mode):
                         'to satisfy the chosen classes_per_it. Decrease the ' +
                         'classes_per_it_{tr/val} option and try again.'))
     return dataset
-
-
 
 def init_sampler(opt, labels, mode):
     if 'train' in mode:
@@ -60,7 +55,6 @@ def init_sampler(opt, labels, mode):
                                     num_samples=num_samples,
                                     iterations=opt.iterations)
 
-
 def init_dataloader(opt, mode):
     dataset = init_dataset(opt, mode)
     # write_plk(
@@ -70,7 +64,6 @@ def init_dataloader(opt, mode):
     sampler = init_sampler(opt, dataset.y, mode)
     dataloader = DataLoader(dataset, batch_sampler=sampler)
     return dataloader, dataset.classes
-
 
 def init_protonet(
         num_classes: int,
@@ -85,11 +78,11 @@ def init_protonet(
 
     # region Load checkpoint if available
     if os.path.exists(checkpoint_path):
+        print(f'Loading checkpoint from: {checkpoint_path}')
         model.load_state_dict(torch.load(checkpoint_path))
     # endregion
 
     return model
-
 
 def init_optim(opt, model):
     '''
@@ -334,7 +327,7 @@ def main():
     model = init_protonet(
         num_classes= len(classes),
         cuda = options.cuda,
-        checkpoint_path= os.path.join(options.exp, 'best_model.pth')
+        checkpoint_path= os.path.join(options.experiment_root, 'best_model.pth')
     )
     optim = init_optim(options, model)
     lr_scheduler = init_lr_scheduler(options, optim)
