@@ -12,9 +12,6 @@ def conv_block(in_channels, out_channels):
         nn.MaxPool2d(2)
     )
 
-
-
-
 class ProtoNet(nn.Module):
     '''
     Model as described in the reference paper,
